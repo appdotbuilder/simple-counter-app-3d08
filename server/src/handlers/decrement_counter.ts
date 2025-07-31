@@ -1,13 +1,36 @@
 
+import { db } from '../db';
+import { countersTable } from '../db/schema';
 import { type DecrementCounterInput, type Counter } from '../schema';
+import { sql } from 'drizzle-orm';
 
 export const decrementCounter = async (input: DecrementCounterInput): Promise<Counter> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is decrementing the counter by the specified amount (default 1)
-    // and returning the updated counter value.
-    return Promise.resolve({
-        id: 1,
-        count: -input.amount,
+  try {
+    // First, ensure a counter exists (create one if it doesn't)
+    const existingCounters = await db.select()
+      .from(countersTable)
+      .limit(1)
+      .execute();
+
+    if (existingCounters.length === 0) {
+      // Create initial counter with value 0, then decrement
+      await db.insert(countersTable)
+        .values({ count: 0 })
+        .execute();
+    }
+
+    // Decrement the counter by the specified amount
+    const result = await db.update(countersTable)
+      .set({ 
+        count: sql`${countersTable.count} - ${input.amount}`,
         updated_at: new Date()
-    } as Counter);
-}
+      })
+      .returning()
+      .execute();
+
+    return result[0];
+  } catch (error) {
+    console.error('Counter decrement failed:', error);
+    throw error;
+  }
+};
